@@ -1,0 +1,10 @@
+[package]
+name = "tnsm-relay-core"
+version = "0.1.0"
+edition = "2021"
+description = "Shared relay rendezvous logic (used by both the headless binary and the GUI)."
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "net", "io-util", "macros", "time", "sync"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"

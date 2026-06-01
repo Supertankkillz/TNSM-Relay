@@ -1,0 +1,16 @@
+# Cargo workspace for the TNSM relay.
+#
+#   core/      shared rendezvous logic (lib) — single source of truth
+#   headless/  always-on service binary (run on the VPS)
+#   gui/       Tauri control panel (run on a desktop machine)
+#
+# Both the headless binary and the GUI depend on `core`, so the relay
+# behaves identically whichever you run.
+
+[workspace]
+resolver = "2"
+members = [
+    "core",
+    "headless",
+    "gui/src-tauri",
+]

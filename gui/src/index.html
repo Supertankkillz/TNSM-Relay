@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TNSM Relay</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel2: #1c2330; --line: #2a3340;
+    --text1: #e6edf3; --text2: #9da7b3; --text3: #6b7685;
+    --green: #3fb950; --green-dim: #1f6f2c; --red: #f85149; --amber: #d29922;
+    --accent: #2f81f7; --mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text1);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px; -webkit-font-smoothing: antialiased; user-select: none;
+    padding: 18px; min-height: 100vh;
+  }
+  .header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  .logo { font-weight: 800; letter-spacing: .5px; font-size: 16px; }
+  .logo .accent { color: var(--accent); }
+  .status-pill {
+    margin-left: auto; display: flex; align-items: center; gap: 7px;
+    font-family: var(--mono); font-size: 12px; padding: 5px 11px;
+    border-radius: 20px; border: 1px solid var(--line); background: var(--panel);
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text3); }
+  .dot.on { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .dot.off { background: var(--red); }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 16px; margin-bottom: 14px;
+  }
+  .panel h2 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text3); margin-bottom: 12px; font-weight: 700;
+  }
+  .row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+  .field { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 140px; }
+  .field label { font-size: 11px; color: var(--text2); }
+  .field input {
+    background: var(--bg); border: 1px solid var(--line); border-radius: 7px;
+    color: var(--text1); padding: 8px 10px; font-family: var(--mono);
+    font-size: 13px; outline: none; transition: border-color .15s;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .hint { font-size: 11px; color: var(--text3); margin-top: 8px; line-height: 1.5; }
+
+  .btn {
+    border: 1px solid var(--line); background: var(--panel2); color: var(--text1);
+    padding: 9px 18px; border-radius: 7px; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all .15s; white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--text3); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn.start { background: var(--green-dim); border-color: var(--green); }
+  .btn.start:hover { background: var(--green); color: #04210a; }
+  .btn.stop { background: #5b1d1d; border-color: var(--red); }
+  .btn.stop:hover { background: var(--red); color: #210404; }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .stat {
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px; text-align: center;
+  }
+  .stat .num { font-family: var(--mono); font-size: 22px; font-weight: 700; color: var(--text1); }
+  .stat .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; color: var(--text3); margin-top: 4px; }
+
+  table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+  th { text-align: left; color: var(--text3); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--line); font-size: 10px; text-transform: uppercase; letter-spacing: .6px; }
+  td { padding: 7px 8px; border-bottom: 1px solid var(--panel2); color: var(--text2); }
+  td.code { color: var(--accent); font-weight: 700; }
+  .empty { color: var(--text3); font-style: italic; padding: 14px 8px; font-family: inherit; }
+
+  .toast {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--panel2); border: 1px solid var(--line); color: var(--text1);
+    padding: 10px 18px; border-radius: 8px; font-size: 12px; opacity: 0;
+    transition: all .25s; pointer-events: none; box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.err { border-color: var(--red); }
+  .badge-secret { font-size: 10px; padding: 2px 7px; border-radius: 10px; border: 1px solid var(--line); color: var(--text3); }
+  .badge-secret.on { color: var(--green); border-color: var(--green-dim); }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">TNSM <span class="accent">RELAY</span></div>
+    <div class="status-pill"><span class="dot" id="dot"></span><span id="status-text">Loading…</span></div>
+    <a id="update-badge" href="#" onclick="openUpdate(event)" style="display:none; margin-left:10px; text-decoration:none; align-items:center; gap:6px; font-size:12px; font-weight:600; color:var(--green); border:1px solid var(--green-dim); background:rgba(63,185,80,.08); padding:5px 11px; border-radius:20px;">
+      ⬆ <span id="update-badge-label">Update</span>
+    </a>
+  </div>
+
+  <div class="panel">
+    <h2>Configuration</h2>
+    <div class="row">
+      <div class="field" style="flex:0 0 130px;">
+        <label>Bind port</label>
+        <input id="port" type="text" inputmode="numeric" placeholder="7800" />
+      </div>
+      <div class="field">
+        <label>Shared secret <span class="badge-secret" id="secret-badge">optional</span></label>
+        <input id="secret" type="text" placeholder="(leave empty for an open relay)" />
+      </div>
+    </div>
+    <div class="hint">
+      The relay binds <b>0.0.0.0:&lt;port&gt;</b> — open that one port on this machine's firewall.
+      Hosts and RC clients dial it outbound. A shared secret keeps the relay private to your own
+      app builds (hosts/RC must send it). Changing config requires a stop + start.
+    </div>
+    <div class="row" style="margin-top:14px;">
+      <button class="btn start" id="btn-start" onclick="startRelay()">Start relay</button>
+      <button class="btn stop" id="btn-stop" onclick="stopRelay()" disabled>Stop</button>
+      <button class="btn" onclick="saveOnly()">Save config</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Live</h2>
+    <div class="stats-grid">
+      <div class="stat"><div class="num" id="s-waiting">0</div><div class="lbl">Waiting hosts</div></div>
+      <div class="stat"><div class="num" id="s-active">0</div><div class="lbl">Active sessions</div></div>
+      <div class="stat"><div class="num" id="s-total">0</div><div class="lbl">Total sessions</div></div>
+      <div class="stat"><div class="num" id="s-rej">0</div><div class="lbl">Rejections</div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Waiting hosts</h2>
+    <table>
+      <thead><tr><th>Code</th><th>From</th><th>Waiting</th></tr></thead>
+      <tbody id="hosts-body"><tr><td colspan="3" class="empty">No hosts registered.</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h2>Active sessions</h2>
+    <table>
+      <thead><tr><th>Code</th><th>Host</th><th>RC</th><th>Duration</th></tr></thead>
+      <tbody id="sessions-body"><tr><td colspan="4" class="empty">No active sessions.</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+  const invoke = window.__TAURI__.core.invoke;
+  let running = false;
+
+  const $ = (id) => document.getElementById(id);
+
+  function toast(msg, isErr) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isErr ? ' err' : '');
+    setTimeout(() => { t.className = 'toast'; }, 2600);
+  }
+
+  function fmtDur(sinceUnix) {
+    const s = Math.max(0, Math.floor(Date.now()/1000) - sinceUnix);
+    if (s < 60) return s + 's';
+    if (s < 3600) return Math.floor(s/60) + 'm ' + (s%60) + 's';
+    return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
+  }
+
+  async function loadConfig() {
+    try {
+      const cfg = await invoke('get_config');
+      const port = (cfg.bind || '0.0.0.0:7800').split(':').pop();
+      $('port').value = port;
+      $('secret').value = cfg.shared_secret || '';
+      updateSecretBadge();
+    } catch (e) { toast('Load config failed: ' + e, true); }
+  }
+
+  function buildConfig() {
+    const port = ($('port').value || '7800').trim();
+    return {
+      bind: '0.0.0.0:' + port,
+      host_ttl_secs: 600,
+      handshake_timeout_secs: 15,
+      shared_secret: $('secret').value.trim(),
+    };
+  }
+
+  function updateSecretBadge() {
+    const b = $('secret-badge');
+    if ($('secret').value.trim()) { b.textContent = 'enabled'; b.className = 'badge-secret on'; }
+    else { b.textContent = 'optional'; b.className = 'badge-secret'; }
+  }
+  $('secret').addEventListener('input', updateSecretBadge);
+
+  window.startRelay = async function () {
+    try {
+      await invoke('start_relay', { config: buildConfig() });
+      toast('Relay started');
+    } catch (e) { toast('Start failed: ' + e, true); }
+  };
+  window.stopRelay = async function () {
+    try { await invoke('stop_relay'); toast('Relay stopped'); }
+    catch (e) { toast('Stop failed: ' + e, true); }
+  };
+  window.saveOnly = async function () {
+    try { await invoke('save_config', { config: buildConfig() }); toast('Config saved'); }
+    catch (e) { toast('Save failed: ' + e, true); }
+  };
+
+  function setRunningUI(on, bind) {
+    running = on;
+    $('dot').className = 'dot ' + (on ? 'on' : 'off');
+    $('status-text').textContent = on ? ('Running · ' + (bind || '')) : 'Stopped';
+    $('btn-start').disabled = on;
+    $('btn-stop').disabled = !on;
+    $('port').disabled = on;
+    $('secret').disabled = on;
+  }
+
+  function fillTable(bodyId, rows, cols, emptyMsg) {
+    const tb = $(bodyId);
+    if (!rows.length) {
+      tb.innerHTML = `<tr><td colspan="${cols}" class="empty">${emptyMsg}</td></tr>`;
+      return;
+    }
+    tb.innerHTML = rows.join('');
+  }
+
+  async function poll() {
+    try {
+      const s = await invoke('get_stats');
+      setRunningUI(s.running, s.bind);
+      $('s-waiting').textContent = s.waiting_hosts.length;
+      $('s-active').textContent = s.active_sessions.length;
+      $('s-total').textContent = s.total_sessions;
+      $('s-rej').textContent = s.total_rejections;
+
+      fillTable('hosts-body',
+        s.waiting_hosts.map(h => `<tr><td class="code">${h.code}</td><td>${h.from}</td><td>${fmtDur(h.since_unix)}</td></tr>`),
+        3, 'No hosts registered.');
+
+      fillTable('sessions-body',
+        s.active_sessions.map(x => `<tr><td class="code">${x.code}</td><td>${x.host_from}</td><td>${x.rc_from}</td><td>${fmtDur(x.since_unix)}</td></tr>`),
+        4, 'No active sessions.');
+    } catch (e) { /* transient */ }
+  }
+
+  let _updateUrl = '';
+  async function checkUpdate() {
+    try {
+      const u = await invoke('check_update');
+      if (u && u.update_available) {
+        _updateUrl = u.url || '';
+        document.getElementById('update-badge-label').textContent = 'Update ' + u.latest;
+        const b = document.getElementById('update-badge');
+        b.title = 'Version ' + u.latest + ' is available (you have ' + u.current + ')'
+                + (u.notes ? '\n\n' + u.notes : '');
+        b.style.display = 'inline-flex';
+      }
+    } catch (e) {
+      // Silent: a failed update check should never disrupt the relay UI.
+      console.info('[update] check skipped:', e);
+    }
+  }
+  window.openUpdate = async function (ev) {
+    if (ev) ev.preventDefault();
+    if (_updateUrl) {
+      // Copy the download URL to the clipboard (clipboard plugin is enabled)
+      // and show it. Avoids needing the opener plugin/permission.
+      try { await window.__TAURI__.clipboardManager.writeText(_updateUrl); toast('Download URL copied: ' + _updateUrl); }
+      catch (e) { toast('Download: ' + _updateUrl); }
+    } else {
+      toast('Update available — check the project page.');
+    }
+  };
+
+  async function init() {
+    await loadConfig();
+    await poll();
+    setInterval(poll, 1500);
+    checkUpdate(); // non-blocking, fire-and-forget
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+</script>
+</body>
+</html>

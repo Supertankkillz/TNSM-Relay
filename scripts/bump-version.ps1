@@ -176,5 +176,47 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
+# -- Upload the built exe/installer to the GitHub release -------------------
+# GitHub auto-creates a release from the pushed tag with "Source code" zips.
+# Those are just source snapshots, NOT your app. We attach the real installer
+# here so the release has a downloadable .exe. Requires the GitHub CLI (gh).
+if (-not $NoBuild) {
+    $ghOk = $false
+    try { & gh --version 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { $ghOk = $true } } catch {}
+    if (-not $ghOk) {
+        Write-Host ""
+        Write-Host "GitHub CLI (gh) not found - skipping exe upload." -ForegroundColor Yellow
+        Write-Host "Install it (winget install GitHub.cli; gh auth login) to auto-attach the exe." -ForegroundColor Yellow
+        Write-Host "Your built exe is local under gui\src-tauri\target\release\bundle\." -ForegroundColor Yellow
+    } else {
+        $bundle = "gui\src-tauri\target\release\bundle"
+        $assets = @()
+        if (Test-Path $bundle) {
+            $assets += Get-ChildItem -Recurse -Path $bundle -Include *.exe,*.msi -ErrorAction SilentlyContinue |
+                       Where-Object { $_.Name -like "*$NewVersion*" } |
+                       ForEach-Object { $_.FullName }
+        }
+        if ($assets.Count -eq 0) {
+            Write-Host ""
+            Write-Host "No installer found under $bundle for v$NewVersion - nothing to upload." -ForegroundColor Yellow
+        } else {
+            Write-Host ""
+            Write-Host "Uploading installer(s) to the GitHub release v$NewVersion ..." -ForegroundColor Cyan
+            foreach ($a in $assets) { Write-Host "  $a" -ForegroundColor Gray }
+            & gh release view "v$NewVersion" 2>$null | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                $notesArg = if ($Notes) { $Notes } else { "Release v$NewVersion" }
+                & gh release create "v$NewVersion" --title "TNSM Relay v$NewVersion" --notes $notesArg
+            }
+            & gh release upload "v$NewVersion" @assets --clobber
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "Installer uploaded to the release." -ForegroundColor Green
+            } else {
+                Write-Host "Upload failed (check 'gh auth status'). Tag/commit are pushed." -ForegroundColor Yellow
+            }
+        }
+    }
+}
+
 Write-Host ""
 Write-Host "Done. v$NewVersion built locally and pushed to git." -ForegroundColor Green

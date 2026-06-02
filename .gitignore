@@ -1,4 +1,14 @@
-/target
-**/target
-gui/dist
-relay-auth.json
+# README-only repo (TNSM-style): the source is NOT tracked here. This repo
+# exists only to host Releases (the built .exe is uploaded as a release asset
+# by scripts/bump-version.ps1). GitHub's auto "Source code" zip will contain
+# only the README, so your source is never exposed.
+#
+# WARNING: because the source is gitignored, GitHub is NOT a backup of your
+# code. Keep your own backup of A:\tnsm-relay-ws.
+
+# Ignore everything by default...
+/*
+
+# ...then un-ignore ONLY what we want public.
+!.gitignore
+!README.md

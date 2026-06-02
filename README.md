@@ -155,6 +155,32 @@ the manifest's is higher. The `url` is where you point users to download the
 new build (a separate distribution decision  -  can be a private release page,
 a paid gate, etc.).
 
+## Running the GUI as the always-on relay (Windows Server)
+
+The GUI app IS the relay - it runs the relay in-process. For a server you run
+one app and it does everything (control panel + the live relay).
+
+1. Build it: `cd gui && cargo tauri build` -> installer in
+   `target/release/bundle/`. Install it on the server.
+2. First launch: log in, set the bind port (7800) + optional shared secret,
+   Save config. Leave "Start relay automatically when this app launches" ON.
+3. Open the firewall (PowerShell as admin):
+   `New-NetFirewallRule -DisplayName "TNSM Relay" -Direction Inbound -Protocol TCP -LocalPort 7800 -Action Allow`
+4. From then on, launching the app auto-starts the relay - no clicking.
+
+### Start automatically on boot
+
+A GUI app needs a desktop session, so use Task Scheduler (not a service):
+- Task Scheduler -> Create Task
+- General: "Run only when user is logged on" (or "logged on" + auto-login the
+  server's user so it survives reboots unattended)
+- Triggers: "At log on"
+- Actions: Start a program -> the installed "TNSM Relay.exe"
+- Save. On boot/login the app launches and auto-starts the relay.
+
+The relay then runs on 0.0.0.0:7800, always on, with the live panel available
+whenever you open the app on the server.
+
 ## Releasing (one command)
 
 Cut a release with the bump script  -  it bumps the version, builds the exe

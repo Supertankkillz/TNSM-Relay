@@ -159,8 +159,13 @@ Write-Host "Committing + tagging v$NewVersion ..." -ForegroundColor Cyan
 & git commit -m $commitMsg
 if ($LASTEXITCODE -ne 0) { Write-Host "Nothing to commit (or commit failed); continuing to tag." -ForegroundColor Yellow }
 
-# Create the tag (delete a same-named local tag first so re-runs don't fail).
-& git tag -d "v$NewVersion" 2>$null | Out-Null
+# Create the tag. Delete a same-named local tag first ONLY if it exists, so
+# re-runs don't fail with "already exists" and we don't print a scary (but
+# harmless) "tag not found" error on the first run.
+$existingTags = & git tag --list "v$NewVersion" 2>$null
+if ($existingTags) {
+    & git tag -d "v$NewVersion" 2>$null | Out-Null
+}
 & git tag "v$NewVersion"
 
 & git push

@@ -1,6 +1,6 @@
 [package]
 name = "tnsm-relay-gui"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 description = "TNSM Relay control panel (GUI)."
 

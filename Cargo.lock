@@ -3991,7 +3991,7 @@ dependencies = [
 
 [[package]]
 name = "tnsm-relay-gui"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "argon2",
  "serde",

@@ -205,8 +205,16 @@ if (-not $NoBuild) {
             Write-Host ""
             Write-Host "Uploading installer(s) to the GitHub release v$NewVersion ..." -ForegroundColor Cyan
             foreach ($a in $assets) { Write-Host "  $a" -ForegroundColor Gray }
-            & gh release view "v$NewVersion" 2>$null | Out-Null
-            if ($LASTEXITCODE -ne 0) {
+            # Check if a release already exists for this tag. Redirect BOTH
+            # streams and ignore failures so gh's "release not found" message
+            # (expected on first release of a version) doesn't surface as a
+            # scary error. We only care about the exit code.
+            $relExists = $false
+            try {
+                & gh release view "v$NewVersion" 2>&1 | Out-Null
+                if ($LASTEXITCODE -eq 0) { $relExists = $true }
+            } catch {}
+            if (-not $relExists) {
                 $notesArg = if ($Notes) { $Notes } else { "Release v$NewVersion" }
                 & gh release create "v$NewVersion" --title "TNSM Relay v$NewVersion" --notes $notesArg
             }

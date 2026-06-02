@@ -88,6 +88,26 @@
 </style>
 </head>
 <body>
+  <div id="login-gate" style="position:fixed; inset:0; background:var(--bg); z-index:1000; display:flex; align-items:center; justify-content:center;">
+    <div style="width:320px; max-width:90vw;">
+      <div class="logo" style="text-align:center; font-size:20px; margin-bottom:6px;">TNSM <span class="accent">RELAY</span></div>
+      <div style="text-align:center; color:var(--text3); font-size:12px; margin-bottom:22px;">Sign in to continue</div>
+      <div class="panel" style="margin:0;">
+        <div class="field" style="margin-bottom:12px;">
+          <label>Username</label>
+          <input id="login-user" type="text" autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="field" style="margin-bottom:16px;">
+          <label>Password</label>
+          <input id="login-pass" type="password" autocomplete="off" />
+        </div>
+        <button class="btn start" style="width:100%;" id="login-btn" onclick="doLogin()">Sign in</button>
+        <div id="login-err" style="color:var(--red); font-size:12px; margin-top:10px; min-height:16px; text-align:center;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="app-root" style="display:none;">
   <div class="header">
     <div class="logo">TNSM <span class="accent">RELAY</span></div>
     <div class="status-pill"><span class="dot" id="dot"></span><span id="status-text">Loading…</span></div>
@@ -145,6 +165,7 @@
       <tbody id="sessions-body"><tr><td colspan="4" class="empty">No active sessions.</td></tr></tbody>
     </table>
   </div>
+  </div><!-- /#app-root -->
 
   <div class="toast" id="toast"></div>
 
@@ -277,16 +298,58 @@
     }
   };
 
+  let _started = false;
+  window.doLogin = async function () {
+    const u = document.getElementById('login-user').value.trim();
+    const p = document.getElementById('login-pass').value;
+    const err = document.getElementById('login-err');
+    err.textContent = '';
+    try {
+      const ok = await invoke('verify_login', { username: u, password: p });
+      if (ok) {
+        document.getElementById('login-gate').style.display = 'none';
+        document.getElementById('app-root').style.display = 'block';
+        if (!_started) { _started = true; init(); }
+      } else {
+        err.textContent = 'Incorrect username or password.';
+        document.getElementById('login-pass').value = '';
+      }
+    } catch (e) {
+      err.textContent = 'Login error: ' + e;
+    }
+  };
+
+  // Enter key submits the login.
+  function wireLoginKeys() {
+    ['login-user', 'login-pass'].forEach(function (id) {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter') { ev.preventDefault(); window.doLogin(); }
+      });
+    });
+    const u = document.getElementById('login-user');
+    if (u) u.focus();
+    // Notice if built-in default credentials are still in use.
+    invoke('using_default_credentials').then(function (isDefault) {
+      if (isDefault) {
+        const err = document.getElementById('login-err');
+        err.style.color = 'var(--amber)';
+        err.textContent = 'Default login (admin / admin) — create relay-auth.json to set your own.';
+      }
+    }).catch(function () {});
+  }
+
   async function init() {
     await loadConfig();
     await poll();
     setInterval(poll, 1500);
     checkUpdate(); // non-blocking, fire-and-forget
   }
+  // Do NOT auto-run the panel; wait for successful login.
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', wireLoginKeys);
   } else {
-    init();
+    wireLoginKeys();
   }
 </script>
 </body>

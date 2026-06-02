@@ -1,0 +1,4 @@
+{
+  "username": "Administrator",
+  "password_hash": "$argon2id$v=19$m=19456,t=2,p=1$REPLACE_WITH_YOUR_GEN-HASH_OUTPUT"
+}

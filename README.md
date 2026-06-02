@@ -1,7 +1,7 @@
 # TNSM Relay (workspace)
 
 The rendezvous relay that lets a TNSM **host** (behind NAT) and a remote
-**RC** client reach each other from anywhere — both dial the relay outbound
+**RC** client reach each other from anywhere  -  both dial the relay outbound
 and are matched by a short code. The relay is a **byte pipe**: the host/RC
 TLS session runs end-to-end *through* it, so it never sees plaintext.
 
@@ -9,8 +9,8 @@ TLS session runs end-to-end *through* it, so it never sees plaintext.
 
 ```
 core/       Shared rendezvous logic (one source of truth).
-headless/   Always-on service binary — run this on your VPS.
-gui/        Tauri control panel — run on a desktop machine.
+headless/   Always-on service binary  -  run this on your VPS.
+gui/        Tauri control panel  -  run on a desktop machine.
 ```
 
 Both `headless` and `gui` use `core`, so they behave identically.
@@ -26,7 +26,7 @@ Both `headless` and `gui` use `core`, so they behave identically.
 > A typical cheap VPS is headless (no desktop), so the GUI usually runs on
 > your own machine while the headless binary runs the real service on the
 > VPS. If your VPS *does* have a desktop, you can run the GUI there instead
-> and skip the headless binary — it runs the relay in-process.
+> and skip the headless binary  -  it runs the relay in-process.
 
 The relay's **public address** (what you type into the Host/RC apps) is your
 VPS's IP/DNS + the bind port. The relay itself doesn't need to know its own
@@ -53,7 +53,7 @@ handshake_timeout_secs = 15
 shared_secret = ""
 ```
 
-Keep it alive with systemd (Linux) or NSSM (Windows) — see the earlier
+Keep it alive with systemd (Linux) or NSSM (Windows)  -  see the earlier
 single-crate README for the exact unit/service definitions.
 
 ### GUI control panel
@@ -83,7 +83,7 @@ can drop/delay traffic but cannot read or forge it without breaking TLS. The
 ## Access control
 
 The relay runs on your VPS. The real gate on "who can touch the relay" is
-**SSH/console access to that VPS** — which only you have. That's genuine
+**SSH/console access to that VPS**  -  which only you have. That's genuine
 access control (it's not on a user's machine, so it can't be bypassed).
 
 To keep stray clients off the relay without a login UX, set `shared_secret`
@@ -103,10 +103,31 @@ It prints an Argon2 hash on stdout (the plaintext is never stored). You would
 paste that hash into an accounts file on the VPS. Not needed for the
 single-operator + shared_secret setup, but the tool is here when you want it.
 
+## GUI login (survives updates)
+
+The GUI prompts for a username + password at launch. Credentials live in a
+LOCAL file next to the exe  -  `relay-auth.json`  -  so updating the app never
+overwrites them:
+
+```json
+{ "username": "Administrator", "password_hash": "$argon2id$..." }
+```
+
+Set it up:
+1. `tnsm-relay gen-hash "yourpassword"`  -> prints an Argon2 hash
+2. Put your username + that hash in `relay-auth.json` next to the GUI exe
+   (a `relay-auth.example.json` is included as a template).
+
+If `relay-auth.json` is missing, the GUI falls back to a built-in default
+(**admin / admin**) and the login screen says so  -  so you can never be locked
+out. Once the file exists, it always wins. The file is gitignored; the
+password itself is never stored (only its hash). This is a launch gate, not
+hard security  -  the relay's real protection is your VPS's SSH access.
+
 ## Update check (GUI)
 
 The GUI shows a passive "Update available" badge when a newer version exists.
-It does NOT auto-install (no signing keys needed) — it just notices and tells
+It does NOT auto-install (no signing keys needed)  -  it just notices and tells
 you, then copies the download URL to your clipboard when clicked.
 
 It checks a small public JSON manifest. Set its URL in
@@ -117,7 +138,7 @@ const UPDATE_MANIFEST_URL: &str = "https://example.com/tnsm-relay/latest.json";
 ```
 
 The manifest is tiny and must be publicly readable (no token). Your source
-repo can stay **private** — only this JSON needs to be public. Host it as a
+repo can stay **private**  -  only this JSON needs to be public. Host it as a
 public Gist raw URL, a GitHub Pages file, or an asset in a public
 "releases-only" repo:
 
@@ -131,6 +152,31 @@ public Gist raw URL, a GitHub Pages file, or an asset in a public
 
 The GUI compares `version` to its own build version and shows the badge if
 the manifest's is higher. The `url` is where you point users to download the
-new build (a separate distribution decision — can be a private release page,
+new build (a separate distribution decision  -  can be a private release page,
 a paid gate, etc.).
 
+## Releasing (one command)
+
+Cut a release with the bump script  -  it bumps the version, builds the exe
+**locally**, then commits/tags/pushes the source to git:
+
+```
+powershell -ExecutionPolicy Bypass -File .\scripts\bump-version.ps1 0.1.1
+```
+
+What it does, in order:
+1. Bumps the version in `gui/src-tauri/tauri.conf.json` and
+   `gui/src-tauri/Cargo.toml` (validates semver, BOM-free writes, verifies
+   both match).
+2. Runs `cargo tauri build`  -  the exe/installer lands under
+   `gui/src-tauri/target/release/bundle/` (path printed at the end).
+3. `git commit` + `git tag vX.Y.Z` + `git push` (source backup + history).
+   Skipped automatically if the folder isn't a git repo.
+
+Flags:
+- `-NoBuild`  bump + git only (skip the local build)
+- `-NoGit`    bump + build only (no commit/push)
+- `-Notes "..."`  release note text for the commit
+
+The downloadable exe is the local build artifact  -  git holds the source, not
+the exe.

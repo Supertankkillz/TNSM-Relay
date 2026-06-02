@@ -1,0 +1,61 @@
+name: release
+
+# Builds the TNSM Relay GUI on a Windows runner and publishes a GitHub
+# Release with the installer + exe attached, whenever you push a version tag
+# like v0.1.0. This is the "bump version, push tag, exe appears on GitHub"
+# workflow — same idea as TNSM's release flow.
+#
+# Usage (from the repo):
+#   1. Bump the version in gui/src-tauri/tauri.conf.json AND
+#      gui/src-tauri/Cargo.toml (keep them equal).
+#   2. git commit -am "release v0.1.0"
+#   3. git tag v0.1.0
+#   4. git push && git push --tags
+#   -> Actions builds it and creates the Release with the .exe attached.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# Needed so tauri-action can create the release + upload assets.
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      # Cache cargo registry + build output so subsequent releases are fast.
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      # Build the Tauri app and create/attach to a GitHub Release. The action
+      # auto-detects the Tauri project, builds the bundle, and uploads the
+      # produced installer(s) + exe as release assets.
+      - name: Build & release (Tauri)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Path to the Tauri project (the dir containing src-tauri).
+          projectPath: gui
+          # Use the pushed tag as the release tag/name.
+          tagName: ${{ github.ref_name }}
+          releaseName: "TNSM Relay ${{ github.ref_name }}"
+          releaseBody: "Automated build of TNSM Relay ${{ github.ref_name }}."
+          releaseDraft: false
+          prerelease: false

@@ -12,7 +12,7 @@
 #   .\scripts\bump-version.ps1 0.1.1 -Notes "Fixed the foo"
 #
 # Version must be strict MAJOR.MINOR.PATCH (e.g. 0.1.1). The build produces
-# the exe under gui\src-tauri\target\release\bundle\ ; the path is printed at
+# the exe under target\release\bundle\ ; the path is printed at
 # the end.
 # -------------------------------------------------------------------------
 
@@ -125,7 +125,7 @@ if ($NoBuild) {
     } finally {
         Pop-Location
     }
-    $bundleDir = "gui\src-tauri\target\release\bundle"
+    $bundleDir = "target\release\bundle"
     Write-Host ""
     Write-Host "Build complete. Artifacts under:" -ForegroundColor Green
     Write-Host "  $repoRoot\$bundleDir" -ForegroundColor Green
@@ -187,9 +187,11 @@ if (-not $NoBuild) {
         Write-Host ""
         Write-Host "GitHub CLI (gh) not found - skipping exe upload." -ForegroundColor Yellow
         Write-Host "Install it (winget install GitHub.cli; gh auth login) to auto-attach the exe." -ForegroundColor Yellow
-        Write-Host "Your built exe is local under gui\src-tauri\target\release\bundle\." -ForegroundColor Yellow
+        Write-Host "Your built exe is local under target\release\bundle\." -ForegroundColor Yellow
     } else {
-        $bundle = "gui\src-tauri\target\release\bundle"
+        # This is a Cargo WORKSPACE, so build output is centralized at the
+        # workspace-root target/ (NOT under gui/src-tauri/).
+        $bundle = "target\release\bundle"
         $assets = @()
         if (Test-Path $bundle) {
             $assets += Get-ChildItem -Recurse -Path $bundle -Include *.exe,*.msi -ErrorAction SilentlyContinue |
